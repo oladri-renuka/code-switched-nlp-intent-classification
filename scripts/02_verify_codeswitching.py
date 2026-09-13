@@ -87,6 +87,8 @@ class CodeSwitchingAnalyzer:
                         stats["items"].append({
                             "id": item.get("id"),
                             "text": text,
+                            "intent": item.get("intent"),
+                            "sentiment": item.get("sentiment"),
                             "languages": langs,
                             "language_pair": lang_pair,
                             "subreddit": sub,
