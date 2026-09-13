@@ -79,16 +79,19 @@ class CodeSwitchedDataset:
             if not text:
                 continue
 
-            # Get annotation (manual or LLM)
-            if use_llm_annotation and "llm_annotation" in item:
+            intent = None
+
+            # Get annotation (direct intent, manual annotation, or LLM)
+            if "intent" in item:
+                intent = item.get("intent", "").lower()
+            elif use_llm_annotation and "llm_annotation" in item:
                 annotation = item["llm_annotation"]
+                intent = annotation.get("intent", "").lower()
             elif "annotation" in item:
                 annotation = item["annotation"]
-            else:
-                continue
+                intent = annotation.get("intent", "").lower()
 
-            intent = annotation.get("intent", "").lower()
-            if intent not in self.INTENT_LABELS:
+            if not intent or intent not in self.INTENT_LABELS:
                 continue
 
             texts.append(text)
@@ -267,18 +270,15 @@ def main():
     dataset_handler = CodeSwitchedDataset(config_path)
     trainer = ModelTrainer(config_path)
 
-    # Load annotated data
-    # Note: This is placeholder - replace with actual annotated data path
-    annotated_file = "data/annotated/llm_annotations.jsonl"
+    # Load cleaned data
+    annotated_file = "data/processed/cleaned_codeswitched.jsonl"
 
     if not Path(annotated_file).exists():
-        logger.error(f"Annotated data file not found: {annotated_file}")
-        logger.info("Please run annotation scripts first:")
-        logger.info("  1. python scripts/01_collect_reddit_data.py")
-        logger.info("  2. python scripts/02_verify_codeswitching.py <data.jsonl>")
-        logger.info("  3. python scripts/03_prepare_label_studio.py <data.jsonl>")
-        logger.info("  4. Annotate in Label Studio and export")
-        logger.info("  5. python scripts/04_llm_annotation.py <data.jsonl>")
+        logger.error(f"Cleaned data file not found: {annotated_file}")
+        logger.info("Please run data preparation scripts first:")
+        logger.info("  1. python scripts/01_load_semeval_data.py SemEval2020-Task9")
+        logger.info("  2. python scripts/02_verify_codeswitching.py data/raw/semeval_codeswitched_data.jsonl")
+        logger.info("  3. python scripts/06_deduplicate_and_clean.py")
         return
 
     # Load and split data
@@ -296,9 +296,9 @@ def main():
     logger.info(f"Dataset split: train={len(train_items)}, val={len(val_items)}, test={len(test_items)}")
 
     # Prepare datasets
-    train_dataset = dataset_handler.prepare_dataset(train_items, use_llm_annotation=True)
-    val_dataset = dataset_handler.prepare_dataset(val_items, use_llm_annotation=True)
-    test_dataset = dataset_handler.prepare_dataset(test_items, use_llm_annotation=True)
+    train_dataset = dataset_handler.prepare_dataset(train_items)
+    val_dataset = dataset_handler.prepare_dataset(val_items)
+    test_dataset = dataset_handler.prepare_dataset(test_items)
 
     # Train with contrastive loss
     contrastive_result = trainer.train_with_contrastive_loss(train_dataset, val_dataset)
