@@ -1,0 +1,161 @@
+# Project Configuration for Code-Switched Intent Classification
+
+# Data Collection Settings
+data_collection:
+  # Reddit API Configuration
+  reddit:
+    subreddits:
+      - r/hinglish        # Hindi-English code-switching
+      - r/latinos         # Spanish-English code-switching
+      - r/IndiansInUSA    # Hindi-English code-switching (diaspora)
+
+    collect_posts: true
+    collect_comments: true
+    limit_per_subreddit: 2000
+    min_chars: 50
+    max_chars: 500
+
+  # Language Detection
+  language_detection:
+    min_languages: 2
+    required_languages: ["en", "hi", "es"]  # English required + Hindi or Spanish
+    confidence_threshold: 0.5
+
+  # Data Storage
+  storage:
+    raw_data_dir: "data/raw"
+    format: "jsonl"  # JSON Lines format
+    chunk_size: 1000
+
+# Annotation Settings
+annotation:
+  tool: "label-studio"
+  label_studio:
+    host: "http://localhost:8080"
+    project_name: "code-switched-intent"
+
+  # Manual annotation target
+  manual_annotation:
+    target_count: 500
+    sampling_strategy: "random"  # or "stratified"
+
+  # LLM-assisted annotation
+  llm_annotation:
+    model: "claude-sonnet-4-6"
+    batch_size: 50
+    few_shot_examples: 5
+    temperature: 0.3
+
+  # Labels to annotate
+  labels:
+    intent:
+      - question
+      - complaint
+      - recommendation
+      - humor
+      - emotional
+      - informational
+
+    sentiment:
+      - positive
+      - negative
+      - neutral
+
+    language_pair:
+      - "en-hi"
+      - "en-es"
+
+# Model Configuration
+model:
+  base_model: "xlm-roberta-large"
+  model_dir: "models/checkpoints"
+
+  # Contrastive Loss Configuration
+  contrastive_loss:
+    enabled: true
+    temperature: 0.07
+    weight: 0.1  # λ in total_loss = CE_loss + λ * contrastive_loss
+    embedding_dim: 768
+
+  # Training Hyperparameters
+  training:
+    epochs: 10
+    batch_size: 32
+    learning_rate: 2e-5
+    weight_decay: 0.01
+    warmup_steps: 500
+    max_grad_norm: 1.0
+
+    # Early Stopping
+    early_stopping:
+      enabled: true
+      patience: 3
+      metric: "eval_f1"
+      mode: "max"
+
+    # Validation
+    validation_split: 0.15
+    test_split: 0.15
+    evaluation_strategy: "epoch"
+    save_strategy: "epoch"
+    load_best_model: true
+
+  # Data Configuration
+  data:
+    max_seq_length: 256
+    num_labels: 6  # number of intent classes
+
+# Evaluation Settings
+evaluation:
+  metrics:
+    - "accuracy"
+    - "precision"
+    - "recall"
+    - "f1"
+    - "macro_f1"  # Primary metric
+
+  # Baselines
+  baselines:
+    base_model: true           # XLM-RoBERTa without fine-tuning
+    google_translate: true     # Translate to English then classify
+
+  # Agreement Analysis
+  agreement:
+    calculate_kappa: true
+    sample_size: 500  # Annotations to compare
+
+# Deployment Settings
+deployment:
+  fastapi:
+    host: "0.0.0.0"
+    port: 8000
+    reload: true
+
+  gradio:
+    host: "127.0.0.1"
+    port: 7860
+    share: false
+
+  model_serving:
+    batch_size: 32
+    device: "cuda"  # or "cpu"
+
+# Logging & Tracking
+logging:
+  level: "INFO"
+  log_dir: "logs"
+
+wandb:
+  enabled: true
+  project: "code-switched-nlp"
+  entity: null  # Your W&B username
+
+# Paths
+paths:
+  raw_data: "data/raw"
+  processed_data: "data/processed"
+  annotated_data: "data/annotated"
+  models: "models/checkpoints"
+  evaluation: "evaluation/results"
+  logs: "logs"
+  notebooks: "notebooks"
