@@ -5,6 +5,7 @@ Train XLM-RoBERTa with contrastive loss for code-switched intent classification.
 
 import json
 import logging
+import sys
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -20,6 +21,7 @@ from transformers import (
     EarlyStoppingCallback,
 )
 
+sys.path.insert(0, str(Path(__file__).parent.parent))
 from models.base_model import load_model_for_training, load_base_model
 
 logging.basicConfig(
