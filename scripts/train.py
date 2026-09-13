@@ -145,7 +145,16 @@ class ModelTrainer:
     def compute_metrics(self, pred):
         """Compute classification metrics."""
         labels = pred.label_ids
-        preds = pred.predictions.argmax(-1)
+
+        # Handle both dict and array predictions
+        if isinstance(pred.predictions, tuple):
+            logits = pred.predictions[0]
+        elif isinstance(pred.predictions, dict):
+            logits = pred.predictions["logits"]
+        else:
+            logits = pred.predictions
+
+        preds = logits.argmax(-1)
 
         precision = precision_score(labels, preds, average="macro", zero_division=0)
         recall = recall_score(labels, preds, average="macro", zero_division=0)
