@@ -43,13 +43,15 @@ class ModelEvaluator:
         except:
             # Fallback: load config and create model
             from transformers import AutoConfig
+            from safetensors.torch import load_file
             config = AutoConfig.from_pretrained("xlm-roberta-large")
             config.num_labels = 6
             model = XLMRobertaForIntentClassification(config)
-            # Load weights
-            import torch
-            state_dict = torch.load(Path(checkpoint_dir) / "pytorch_model.bin", map_location=self.device)
-            model.load_state_dict(state_dict)
+            # Load weights from safetensors
+            safetensors_path = Path(checkpoint_dir) / "model.safetensors"
+            if safetensors_path.exists():
+                state_dict = load_file(safetensors_path)
+                model.load_state_dict(state_dict)
 
         model.to(self.device)
         model.eval()
