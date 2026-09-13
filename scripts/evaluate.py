@@ -38,11 +38,19 @@ class ModelEvaluator:
     def load_contrastive_model(self, checkpoint_dir="models/checkpoints/contrastive"):
         """Load contrastive model."""
         logger.info(f"Loading contrastive model from {checkpoint_dir}...")
-        config_path = Path(checkpoint_dir) / "config.json"
+        try:
+            model = XLMRobertaForIntentClassification.from_pretrained(checkpoint_dir)
+        except:
+            # Fallback: load config and create model
+            from transformers import AutoConfig
+            config = AutoConfig.from_pretrained("xlm-roberta-large")
+            config.num_labels = 6
+            model = XLMRobertaForIntentClassification(config)
+            # Load weights
+            import torch
+            state_dict = torch.load(Path(checkpoint_dir) / "pytorch_model.bin", map_location=self.device)
+            model.load_state_dict(state_dict)
 
-        from transformers import AutoConfig
-        config = AutoConfig.from_pretrained(checkpoint_dir)
-        model = XLMRobertaForIntentClassification.from_pretrained(checkpoint_dir)
         model.to(self.device)
         model.eval()
         return model
