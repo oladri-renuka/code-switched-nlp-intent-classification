@@ -85,7 +85,7 @@ class XLMRobertaForIntentClassification(PreTrainedModel):
         input_ids: torch.Tensor,
         attention_mask: torch.Tensor = None,
         token_type_ids: torch.Tensor = None,
-        intent_labels: torch.Tensor = None,
+        labels: torch.Tensor = None,
         use_contrastive_loss: bool = True,
     ):
         """
@@ -95,7 +95,7 @@ class XLMRobertaForIntentClassification(PreTrainedModel):
             input_ids: [batch_size, seq_length]
             attention_mask: [batch_size, seq_length]
             token_type_ids: [batch_size, seq_length]
-            intent_labels: [batch_size] - intent class labels
+            labels: [batch_size] - intent class labels
             use_contrastive_loss: Whether to include contrastive loss
 
         Returns:
@@ -129,14 +129,14 @@ class XLMRobertaForIntentClassification(PreTrainedModel):
         }
 
         # Calculate losses if labels provided
-        if intent_labels is not None:
+        if labels is not None:
             # Cross-entropy loss for classification
-            ce_loss = nn.CrossEntropyLoss()(intent_logits, intent_labels)
+            ce_loss = nn.CrossEntropyLoss()(intent_logits, labels)
 
             # Contrastive loss
             contrastive_loss = 0.0
-            if use_contrastive_loss and intent_labels.unique().shape[0] > 1:
-                contrastive_loss = self.contrastive_loss_fn(embeddings, intent_labels)
+            if use_contrastive_loss and labels.unique().shape[0] > 1:
+                contrastive_loss = self.contrastive_loss_fn(embeddings, labels)
 
             # Total loss with weighting
             lambda_contrastive = 0.1
