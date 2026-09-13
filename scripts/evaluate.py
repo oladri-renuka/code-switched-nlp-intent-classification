@@ -32,26 +32,30 @@ class ModelEvaluator:
         self.device = device
         self.tokenizer = AutoTokenizer.from_pretrained("xlm-roberta-large")
 
-    def load_contrastive_model(self, checkpoint_dir="models/checkpoints/contrastive"):
-        """Load contrastive model from safetensors."""
+    def load_contrastive_model(self):
+        """Load best contrastive model (last checkpoint)."""
         logger.info(f"Loading contrastive model...")
+        checkpoint_dir = Path("models/checkpoints/contrastive")
+        latest = sorted(checkpoint_dir.glob("checkpoint-*"))[-1]
+
         config = AutoConfig.from_pretrained("xlm-roberta-large")
         config.num_labels = 6
         model = XLMRobertaForIntentClassification(config)
-
-        state_dict = load_file(Path(checkpoint_dir) / "model.safetensors")
+        state_dict = load_file(latest / "model.safetensors")
         model.load_state_dict(state_dict)
         model.to(self.device).eval()
         return model
 
-    def load_baseline_model(self, checkpoint_dir="models/checkpoints/baseline"):
-        """Load baseline model from safetensors."""
+    def load_baseline_model(self):
+        """Load best baseline model (last checkpoint)."""
         logger.info(f"Loading baseline model...")
+        checkpoint_dir = Path("models/checkpoints/baseline")
+        latest = sorted(checkpoint_dir.glob("checkpoint-*"))[-1]
+
         config = AutoConfig.from_pretrained("xlm-roberta-large")
         config.num_labels = 6
         model = AutoModelForSequenceClassification.from_config(config)
-
-        state_dict = load_file(Path(checkpoint_dir) / "model.safetensors")
+        state_dict = load_file(latest / "model.safetensors")
         model.load_state_dict(state_dict)
         model.to(self.device).eval()
         return model
