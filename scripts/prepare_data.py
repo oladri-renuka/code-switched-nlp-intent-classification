@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 class DataPreparationPipeline:
     """Complete data preparation for training."""
 
+    SENTIMENT_MAP = {"0": "negative", "1": "neutral", "2": "positive"}
     INTENT_LABELS = {
         "negative": "complaint",
         "neutral": "informational",
@@ -59,9 +60,10 @@ class DataPreparationPipeline:
                     if len(parts) < 3:
                         continue
 
-                    item_id, text, sentiment_label = parts[0], parts[1], parts[2].strip()
+                    item_id, text, sentiment_code = parts[0], parts[1], parts[2].strip()
 
-                    if sentiment_label not in self.INTENT_LABELS:
+                    sentiment_label = self.SENTIMENT_MAP.get(sentiment_code)
+                    if not sentiment_label or sentiment_label not in self.INTENT_LABELS:
                         continue
 
                     items.append({
