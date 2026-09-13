@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Evaluate both contrastive and baseline models on test set."""
+"""Evaluate both models on test set - simple & robust."""
 
 import sys
 sys.path.insert(0, str(__import__('pathlib').Path(__file__).parent.parent))
@@ -9,7 +9,8 @@ import logging
 from pathlib import Path
 import numpy as np
 import torch
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from transformers import AutoTokenizer, AutoConfig, AutoModelForSequenceClassification
+from safetensors.torch import load_file
 
 from scripts.train import CodeSwitchedDataset
 from models.base_model import XLMRobertaForIntentClassification
@@ -22,12 +23,8 @@ class ModelEvaluator:
     """Evaluate trained models."""
 
     INTENT_LABELS = {
-        "question": 0,
-        "complaint": 1,
-        "recommendation": 2,
-        "humor": 3,
-        "emotional": 4,
-        "informational": 5,
+        "question": 0, "complaint": 1, "recommendation": 2,
+        "humor": 3, "emotional": 4, "informational": 5,
     }
     ID_TO_INTENT = {v: k for k, v in INTENT_LABELS.items()}
 
@@ -36,58 +33,39 @@ class ModelEvaluator:
         self.tokenizer = AutoTokenizer.from_pretrained("xlm-roberta-large")
 
     def load_contrastive_model(self, checkpoint_dir="models/checkpoints/contrastive"):
-        """Load contrastive model."""
-        logger.info(f"Loading contrastive model from {checkpoint_dir}...")
-        try:
-            model = XLMRobertaForIntentClassification.from_pretrained(checkpoint_dir)
-        except:
-            # Fallback: load config and create model
-            from transformers import AutoConfig
-            from safetensors.torch import load_file
-            config = AutoConfig.from_pretrained("xlm-roberta-large")
-            config.num_labels = 6
-            model = XLMRobertaForIntentClassification(config)
-            # Load weights from safetensors
-            safetensors_path = Path(checkpoint_dir) / "model.safetensors"
-            if safetensors_path.exists():
-                state_dict = load_file(safetensors_path)
-                model.load_state_dict(state_dict)
+        """Load contrastive model from safetensors."""
+        logger.info(f"Loading contrastive model...")
+        config = AutoConfig.from_pretrained("xlm-roberta-large")
+        config.num_labels = 6
+        model = XLMRobertaForIntentClassification(config)
 
-        model.to(self.device)
-        model.eval()
+        state_dict = load_file(Path(checkpoint_dir) / "model.safetensors")
+        model.load_state_dict(state_dict)
+        model.to(self.device).eval()
         return model
 
     def load_baseline_model(self, checkpoint_dir="models/checkpoints/baseline"):
-        """Load baseline model."""
-        logger.info(f"Loading baseline model from {checkpoint_dir}...")
-        model = AutoModelForSequenceClassification.from_pretrained(checkpoint_dir)
-        model.to(self.device)
-        model.eval()
+        """Load baseline model from safetensors."""
+        logger.info(f"Loading baseline model...")
+        config = AutoConfig.from_pretrained("xlm-roberta-large")
+        config.num_labels = 6
+        model = AutoModelForSequenceClassification.from_config(config)
+
+        state_dict = load_file(Path(checkpoint_dir) / "model.safetensors")
+        model.load_state_dict(state_dict)
+        model.to(self.device).eval()
         return model
 
     def predict_batch(self, texts, model, model_type="contrastive"):
-        """Get predictions for a batch of texts."""
+        """Get predictions for texts."""
         predictions = []
-
         for text in texts:
-            inputs = self.tokenizer(
-                text,
-                truncation=True,
-                max_length=256,
-                return_tensors="pt",
-            ).to(self.device)
-
+            inputs = self.tokenizer(text, truncation=True, max_length=256, return_tensors="pt").to(self.device)
             with torch.no_grad():
-                if model_type == "contrastive":
-                    outputs = model(**inputs)
-                    logits = outputs["logits"]
-                else:
-                    outputs = model(**inputs)
-                    logits = outputs.logits
-
+                outputs = model(**inputs)
+                logits = outputs["logits"] if isinstance(outputs, dict) else outputs.logits
             pred = logits.argmax(-1).item()
             predictions.append(pred)
-
         return predictions
 
     def evaluate(self, test_items, contrastive_model, baseline_model):
@@ -99,60 +77,47 @@ class ModelEvaluator:
         logger.info("EVALUATING MODELS")
         logger.info("="*60)
 
-        # Contrastive predictions
         logger.info("\nContrastive model predictions...")
         contrastive_preds = self.predict_batch(texts, contrastive_model, "contrastive")
 
-        # Baseline predictions
         logger.info("Baseline model predictions...")
         baseline_preds = self.predict_batch(texts, baseline_model, "baseline")
 
-        # Compute metrics
         logger.info("\n" + "="*60)
-        logger.info("CONTRASTIVE MODEL")
+        logger.info("CONTRASTIVE MODEL RESULTS")
         logger.info("="*60)
         self._print_metrics(true_labels, contrastive_preds)
 
         logger.info("\n" + "="*60)
-        logger.info("BASELINE MODEL")
+        logger.info("BASELINE MODEL RESULTS")
         logger.info("="*60)
         self._print_metrics(true_labels, baseline_preds)
 
-        # Comparison
         logger.info("\n" + "="*60)
         logger.info("COMPARISON")
         logger.info("="*60)
         agreement = sum(1 for c, b in zip(contrastive_preds, baseline_preds) if c == b)
-        agreement_pct = (agreement / len(contrastive_preds)) * 100
-        logger.info(f"Model Agreement: {agreement}/{len(contrastive_preds)} ({agreement_pct:.1f}%)")
+        logger.info(f"Model Agreement: {agreement}/{len(contrastive_preds)} ({agreement/len(contrastive_preds)*100:.1f}%)")
 
     def _print_metrics(self, true_labels, preds):
-        """Print detailed metrics."""
-        accuracy = accuracy_score(true_labels, preds)
-        precision, recall, f1, _ = precision_recall_fscore_support(
-            true_labels, preds, average="macro", zero_division=0
-        )
+        """Print metrics."""
+        acc = accuracy_score(true_labels, preds)
+        prec, rec, f1, _ = precision_recall_fscore_support(true_labels, preds, average="macro", zero_division=0)
 
-        logger.info(f"Accuracy:  {accuracy:.4f}")
-        logger.info(f"Precision: {precision:.4f}")
-        logger.info(f"Recall:    {recall:.4f}")
+        logger.info(f"Accuracy:  {acc:.4f}")
+        logger.info(f"Precision: {prec:.4f}")
+        logger.info(f"Recall:    {rec:.4f}")
         logger.info(f"F1 (macro): {f1:.4f}")
 
-        logger.info("\nPer-class metrics:")
-        report = classification_report(
-            true_labels, preds,
-            target_names=[self.ID_TO_INTENT[i] for i in range(6)],
-            zero_division=0
-        )
+        logger.info("\nPer-class:")
+        report = classification_report(true_labels, preds, target_names=[self.ID_TO_INTENT[i] for i in range(6)], zero_division=0)
         logger.info("\n" + report)
-
 
 def main():
     logger.info("="*60)
-    logger.info("Model Evaluation on Test Set")
+    logger.info("Model Evaluation")
     logger.info("="*60)
 
-    # Load test data
     dataset_handler = CodeSwitchedDataset()
     items = dataset_handler.load_annotations("data/processed/cleaned_codeswitched.jsonl")
 
@@ -161,18 +126,14 @@ def main():
     val_size = int(0.1 * len(items))
     test_items = items[train_size + val_size:]
 
-    logger.info(f"Test set size: {len(test_items)}")
+    logger.info(f"Test set: {len(test_items)} samples")
 
-    # Load models
     evaluator = ModelEvaluator()
     contrastive_model = evaluator.load_contrastive_model()
     baseline_model = evaluator.load_baseline_model()
 
-    # Evaluate
     evaluator.evaluate(test_items, contrastive_model, baseline_model)
-
-    logger.info("\n✓ Evaluation complete!")
-
+    logger.info("\n✓ Done!")
 
 if __name__ == "__main__":
     main()
