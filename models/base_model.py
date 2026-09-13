@@ -64,12 +64,11 @@ class XLMRobertaForIntentClassification(PreTrainedModel):
     """
 
     config_class = AutoConfig
-    _tied_weights_keys = []
 
     def __init__(self, config):
         super().__init__(config)
 
-        self.xlm_roberta = AutoModel.from_config(config)
+        self.xlm_roberta = AutoModel.from_pretrained(config._name_or_path, config=config)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
         # Classification head
@@ -80,12 +79,6 @@ class XLMRobertaForIntentClassification(PreTrainedModel):
 
         # Contrastive loss
         self.contrastive_loss_fn = ContrastiveLoss(temperature=0.07)
-
-        self.init_weights()
-
-    @property
-    def all_tied_weights_keys(self):
-        return self._tied_weights_keys
 
     def forward(
         self,
