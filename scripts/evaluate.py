@@ -114,7 +114,7 @@ class ModelEvaluator:
         logger.info(f"F1 (macro): {f1:.4f}")
 
         logger.info("\nPer-class:")
-        report = classification_report(true_labels, preds, target_names=[self.ID_TO_INTENT[i] for i in range(6)], zero_division=0)
+        report = classification_report(true_labels, preds, labels=range(6), target_names=[self.ID_TO_INTENT[i] for i in range(6)], zero_division=0)
         logger.info("\n" + report)
 
 def main():
