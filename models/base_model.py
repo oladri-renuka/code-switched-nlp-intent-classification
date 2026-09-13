@@ -83,6 +83,10 @@ class XLMRobertaForIntentClassification(PreTrainedModel):
 
         self.init_weights()
 
+    @property
+    def all_tied_weights_keys(self):
+        return self._tied_weights_keys
+
     def forward(
         self,
         input_ids: torch.Tensor,
